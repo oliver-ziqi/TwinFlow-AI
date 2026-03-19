@@ -1,12 +1,24 @@
-# JaamSim AI RCA
+<p align="center">
+  <img src="doc/logo.png" alt="Project Logo" width="260" />
+</p>
 
-An AI-assisted root cause analysis platform for logistics simulation, built around JaamSim, Kafka, FastAPI, InfluxDB, PostgreSQL, and a human-in-the-loop decision workflow.
+<h1 align="center">JaamSim AI RCA</h1>
+
+<p align="center">
+  An AI-assisted root cause analysis platform for logistics simulation, built around JaamSim, Kafka, FastAPI, InfluxDB, PostgreSQL, and a human-in-the-loop decision workflow.
+</p>
+
+<p align="center">
+  Developed as part of the research and engineering work at <strong>NUS CDE Network Lab</strong>.
+</p>
 
 ![Frontend UI](doc/frontend-UI.png)
 
 This project is designed as an interactive operations cockpit rather than a standalone model demo. The frontend combines a digital twin view, live inventory dashboard, runtime controls, and an AI incident copilot so that operators can move from abnormal event detection to RCA explanation and then to a controlled corrective action in one interface.
 
 At the core of the system is a practical engineering question: when an abnormal event happens in a simulated production and transport network, how do we move from raw telemetry and alert signals to an explainable RCA conclusion, and finally to a safe, reviewable branch-level action?
+
+Engineering reflection: [`Vibe Coding Lessons Learned`](doc/vibe%20coding.md)
 
 ## Project Overview
 
