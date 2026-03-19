@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factory Inventory Panel</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --card: #ffffff;
+      --text: #0f172a;
+      --sub: #475569;
+      --line: #dbe3ef;
+      --accent: #0ea5e9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 10%, #e0f2fe 0%, transparent 30%),
+        radial-gradient(circle at 90% 5%, #ede9fe 0%, transparent 28%),
+        var(--bg);
+    }
+    .wrap {
+      max-width: 1320px;
+      margin: 24px auto;
+      padding: 0 16px;
+    }
+    .head {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+      margin-bottom: 14px;
+    }
+    .title { margin: 0 0 4px; font-size: 24px; font-weight: 700; }
+    .sub { margin: 0; color: var(--sub); font-size: 14px; }
+    .form {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 110px 160px auto;
+      gap: 10px;
+    }
+    input, select, button {
+      border: 1px solid #cdd8e7;
+      border-radius: 10px;
+      height: 40px;
+      padding: 0 10px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text);
+    }
+    button {
+      background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 100%);
+      color: #fff;
+      border: 0;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+    }
+    iframe {
+      width: 100%;
+      height: 860px;
+      border: 0;
+      display: block;
+      background: #fff;
+    }
+    .tips {
+      margin-top: 10px;
+      color: var(--sub);
+      font-size: 13px;
+    }
+    code {
+      background: #eef2ff;
+      border: 1px solid #dbe3ef;
+      border-radius: 6px;
+      padding: 1px 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="head">
+      <h1 class="title">Factory Inventory Dashboard</h1>
+      <p class="sub">Load Grafana panel directly. This page is designed for later integration with your existing UI.</p>
+      <div class="form">
+        <input id="grafanaBase" value="http://192.168.17.128:3000" placeholder="Grafana base URL">
+        <input id="dashboardUid" value="jaamsim-factory-inventory" placeholder="Dashboard UID">
+        <input id="orgId" value="1" placeholder="Org ID">
+        <select id="fromRange">
+          <option value="now-15m">now-15m</option>
+          <option value="now-1h">now-1h</option>
+          <option value="now-6h">now-6h</option>
+          <option value="now-24h">now-24h</option>
+        </select>
+        <button id="loadBtn">Load Panel</button>
+      </div>
+      <div class="tips">
+        If iframe is blank, set Grafana <code>allow_embedding = true</code> and ensure this dashboard exists.
+      </div>
+    </section>
+
+    <section class="panel">
+      <iframe id="grafanaFrame" title="Grafana Inventory Panel"></iframe>
+    </section>
+  </div>
+
+  <script>
+    function buildDashboardUrl() {
+      const base = document.getElementById("grafanaBase").value.replace(/\/+$/, "");
+      const uid = document.getElementById("dashboardUid").value.trim();
+      const orgId = document.getElementById("orgId").value.trim() || "1";
+      const from = document.getElementById("fromRange").value;
+      const to = "now";
+
+      // /d/{uid}/{slug}
+      return `${base}/d/${encodeURIComponent(uid)}/factory-inventory` +
+        `?orgId=${encodeURIComponent(orgId)}` +
+        `&from=${encodeURIComponent(from)}` +
+        `&to=${encodeURIComponent(to)}` +
+        `&kiosk`;
+    }
+
+    function loadFrame() {
+      document.getElementById("grafanaFrame").src = buildDashboardUrl();
+    }
+
+    document.getElementById("loadBtn").addEventListener("click", loadFrame);
+    window.addEventListener("DOMContentLoaded", loadFrame);
+  </script>
+</body>
+</html>
+

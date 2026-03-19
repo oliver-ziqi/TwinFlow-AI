@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets.*
+
+# Logs and runtime state
+*.log
+*.out
+*.err
+*.pid
+services/logs/
+services/alert_cursor.txt
+
+# Local databases / temp files
+*.sqlite
+*.sqlite3
+*.db
+*.tmp
+*.temp
+
+# Frontend/generated assets
+ui/Streamlit_files/
+
+# Local test and tool output
+.cache/
+.tox/
+.nox/
+
+# Simulation/local binaries and generated files
+simulation/logistics/*.log
+

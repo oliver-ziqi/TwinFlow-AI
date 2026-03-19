@@ -1,0 +1,10 @@
+{
+  "time": "2026-02-02T08:10:00Z",
+  "thingId": "my_logistics_car2",
+  "alert_type": "motion_stopped",
+  "message": "Car my_logistics_car2 has been stationary for 1 minute!",
+  "car_position": [-10.9, -13.8, 0.01],
+  "branch_key": "branch_3",
+  "branch_value": 2,
+  "source": "manual"
+}

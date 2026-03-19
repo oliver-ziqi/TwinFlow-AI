@@ -1,0 +1,96 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [
+        {
+          "query": "from(bucket: \"factory_data\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"factory\")\n  |> filter(fn: (r) => r._field == \"count\")\n  |> filter(fn: (r) => r.thingId =~ /^${thing_id:regex}$/)\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> yield(name: \"inventory\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Factory Inventory Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 3}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 10},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"query": "from(bucket: \"factory_data\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"factory\") |> filter(fn: (r) => r._field == \"count\") |> filter(fn: (r) => r.thingId == \"my_factory_factoryA\") |> last()", "refId": "A"}],
+      "title": "Factory A Current",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 3}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 10},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"query": "from(bucket: \"factory_data\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"factory\") |> filter(fn: (r) => r._field == \"count\") |> filter(fn: (r) => r.thingId == \"my_factory_factoryB\") |> last()", "refId": "A"}],
+      "title": "Factory B Current",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 3}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 10},
+      "id": 4,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"query": "from(bucket: \"factory_data\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"factory\") |> filter(fn: (r) => r._field == \"count\") |> filter(fn: (r) => r.thingId == \"my_factory_factoryC\") |> last()", "refId": "A"}],
+      "title": "Factory C Current",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 3}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 10},
+      "id": 5,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"query": "from(bucket: \"factory_data\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"factory\") |> filter(fn: (r) => r._field == \"count\") |> filter(fn: (r) => r.thingId == \"my_factory_factoryD\") |> last()", "refId": "A"}],
+      "title": "Factory D Current",
+      "type": "stat"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 40,
+  "style": "dark",
+  "tags": ["jaamsim", "factory", "inventory"],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_INFLUXDB",
+        "type": "datasource",
+        "query": "influxdb",
+        "current": {"selected": true, "text": "InfluxDB", "value": "InfluxDB"}
+      },
+      {
+        "name": "thing_id",
+        "type": "query",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: \"factory_data\", tag: \"thingId\", predicate: (r) => r._measurement == \"factory\")",
+        "includeAll": true,
+        "multi": true,
+        "refresh": 1,
+        "sort": 1
+      }
+    ]
+  },
+  "time": {"from": "now-15m", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "JaamSim Factory Inventory",
+  "uid": "jaamsim-factory-inventory",
+  "version": 1,
+  "weekStart": ""
+}
