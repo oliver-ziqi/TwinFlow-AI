@@ -1,316 +1,235 @@
-# JaamSim Logistics Incident RCA (Kafka → LangGraph → Gemini → UI)
+# JaamSim AI RCA
 
-This repo wires your pipeline end-to-end:
+An AI-assisted root cause analysis platform for logistics simulation, built around JaamSim, Kafka, FastAPI, InfluxDB, PostgreSQL, and a human-in-the-loop decision workflow.
 
-1) Alerts are **produced to Kafka** (`alert-events`) either by:
-   - `services/influx_alert_watcher.py` (poll InfluxDB alert bucket) **or**
-   - `api/webhook_server.py` (FastAPI endpoint that forwards to Kafka)
+![Frontend UI](doc/frontend-UI.png)
 
-2) `services/alert_event_consumer.py` consumes `alert-events`, runs the **LangGraph workflow** (PG configs + Influx metrics + Gemini),
-   stores results to **Postgres**, and also publishes to Kafka (`analysis-results`).
+This project is designed as an interactive operations cockpit rather than a standalone model demo. The frontend combines a digital twin view, live inventory dashboard, runtime controls, and an AI incident copilot so that operators can move from abnormal event detection to RCA explanation and then to a controlled corrective action in one interface.
 
-3) `ui/streamlit_app.py` shows a **trace viewer** (per-node updates) and the final RCA output.
+At the core of the system is a practical engineering question: when an abnormal event happens in a simulated production and transport network, how do we move from raw telemetry and alert signals to an explainable RCA conclusion, and finally to a safe, reviewable branch-level action?
 
-4) `services/mqtt_influx_bridge.py` can ingest JaamSim MQTT telemetry (for example `factory/f1`) into InfluxDB bucket `factory_data` for Grafana dashboards.
+## Project Overview
 
-> **Important:** set `GEMINI_API_KEY` in env; do not hardcode API keys.
+The system connects four concerns into one end-to-end workflow:
 
----
+- **simulation and telemetry**: JaamSim produces vehicle, route, branch, and inventory-related state
+- **event ingestion**: abnormal events are captured through InfluxDB polling or FastAPI webhooks and routed into Kafka
+- **agentic reasoning**: an AI workflow gathers facts from databases, files, branch mappings, and time-series signals before generating RCA output
+- **operator-facing decision support**: the UI shows evidence, proposed fixes, and requires confirmation before any branch change is applied
 
-## 1) Project layout
+Instead of treating RCA as a pure LLM text-generation task, this project uses a structured workflow where the model is only one part of the reasoning chain. Deterministic tools collect operational facts first, and the final analysis is grounded in simulation topology, branch state, transport paths, and recent metrics.
 
-```
+![System Architecture](doc/aichitecture.png)
+
+## Why This Project Matters
+
+This repository is designed as a portfolio project around **industrial AI reasoning** rather than only dashboarding or model integration.
+
+The core value is the RCA layer:
+
+- turning abnormal events into structured incident facts
+- distinguishing symptoms from underlying causal bottlenecks
+- combining rule-based reasoning with LLM summarization
+- proposing corrective branch changes with explicit evidence
+- keeping a human approval gate before execution
+
+In other words, the project is about building an **explainable AI operations workflow**, not just a chatbot on top of logs.
+
+## System Architecture
+
+The platform is organized as a layered architecture:
+
+### 1. Physical and Simulation Layer
+
+- JaamSim models the logistics environment
+- simulation files define branches, paths, product movement, and runtime behavior
+- sensor and MQTT-style data can represent upstream operational state
+
+### 2. Digital Twin and Event Layer
+
+- abnormal events are collected from runtime signals
+- Kafka acts as the event backbone for decoupled ingestion and analysis
+- InfluxDB stores time-series state used for alerts and trend analysis
+
+### 3. AI Service Layer
+
+- FastAPI exposes webhook and UI-facing APIs
+- the workflow engine prepares plans, executes tools, and assembles RCA evidence
+- PostgreSQL stores incident records and analysis results
+- the reasoning layer can propose branch-level corrective actions
+
+### 4. UI and Human-in-the-Loop Layer
+
+- Streamlit and HTML-based UI components present the digital twin and incident workflow
+- the operator can inspect evidence, review RCA output, and approve or reject branch changes
+
+## Agentic Workflow
+
+![Agentic Workflow](doc/workflow.png)
+
+The workflow is intentionally staged so that analysis is inspectable and controllable:
+
+1. **Input normalization**
+   User queries and abnormal events are converted into a common workflow state.
+
+2. **Intent detection and routing**
+   The system decides whether the request is incident RCA, data query, or action-oriented analysis.
+
+3. **Fact collection**
+   Tools gather structured evidence from:
+   - branch configuration files
+   - PostgreSQL configuration and incident data
+   - InfluxDB metrics and time-series state
+   - event payload details such as `thingId`, branch values, and car position
+
+4. **Reasoning and plan execution**
+   The workflow determines which tools to call and in what order. This keeps the LLM from answering before operational facts are known.
+
+5. **RCA generation**
+   Deterministic logic classifies likely causes, and the model summarizes the causal chain, evidence, confidence, and next checks.
+
+6. **Action proposal**
+   If the workflow identifies a likely branch-routing issue, it generates a branch-fix proposal with current value, recommended value, and justification.
+
+7. **Human approval**
+   The branch change is not applied automatically. The operator confirms the proposed action in the UI.
+
+8. **Validation**
+   The system can verify whether the applied change restores expected movement or reduces the abnormal condition.
+
+## RCA Design Highlights
+
+The RCA portion is the most important part of this project.
+
+### 1. Structured Incident Understanding
+
+The system first extracts normalized facts from raw event data:
+
+- abnormal event type
+- affected entity or vehicle
+- event time
+- reported branch key and branch value
+- vehicle position
+- human-readable abnormal message
+
+This step makes later reasoning more robust because downstream logic works on structured facts instead of brittle free text.
+
+### 2. Rules-First, LLM-Second Reasoning
+
+A key design decision is that the model does not directly guess the root cause from the alert message alone.
+
+Instead, the workflow:
+
+- collects the required inputs for the affected product flow
+- checks queue and inventory evidence from time-series data
+- maps shortage signals back to source factories and logistics edges
+- checks whether branch settings match the intended transport path
+- only then asks the model to summarize the RCA result
+
+This reduces hallucination risk and makes the output more defensible.
+
+### 3. Root Cause vs Symptom Separation
+
+In logistics systems, many alerts are downstream symptoms rather than primary causes. For example:
+
+- a stopped vehicle may be caused by a blocked route rather than a vehicle fault
+- an empty queue may be caused by upstream transport misrouting rather than low production
+- a local shortage may actually originate from branch settings that prevent carriers from returning to the correct source path
+
+The RCA logic is designed to reason across topology and dependencies, rather than stopping at the first visible symptom.
+
+### 4. Transport-Aware Branch Fix Proposal
+
+The workflow can propose a branch change when evidence suggests a routing mismatch. This proposal is not a blind recommendation; it is generated from:
+
+- current branch values
+- expected branch value on relevant logistics edges
+- shortage products and their source factories
+- observed incident branch
+- transport policy rules derived from configuration
+
+That makes the suggested fix traceable to the actual structure of the simulated system.
+
+### 5. Explainability and Operational Safety
+
+Each RCA result is designed to answer:
+
+- what likely failed
+- why the system believes that
+- what evidence supports the conclusion
+- what should be checked next
+- what action is suggested
+
+The final action remains human-approved, which is important for any operational AI workflow that can affect system behavior.
+
+## Example RCA Scenario
+
+A representative scenario in this project is a stationary vehicle incident in the logistics network.
+
+The workflow does not stop at "vehicle stopped moving." It tries to answer deeper questions:
+
+- Is the vehicle blocked because the destination path is wrong?
+- Is a product queue empty because production is low, or because transport is not returning to the right branch?
+- Is the currently active branch consistent with the shortage route implied by topology?
+
+This turns the RCA result from a surface-level alert explanation into a more useful operational diagnosis.
+
+## Technical Stack
+
+- **Simulation**: JaamSim
+- **Event bus**: Kafka
+- **API layer**: FastAPI
+- **AI orchestration**: workflow graph plus tool-based execution
+- **Time-series storage**: InfluxDB
+- **relational storage**: PostgreSQL
+- **UI**: Streamlit, HTML, Three.js
+
+## Repository Structure
+
+```text
 jaamsim-ai-rca/
-  api/
-    webhook_server.py
-  services/
-    influx_alert_watcher.py
-    alert_event_consumer.py
-  ai/
-    workflow.py
-    pg.py
-    influx.py
-    utils.py
-    types.py
-  ui/
-    streamlit_app.py
-  db/
-    init.sql
-  docker-compose.yml
-  requirements.txt
-  .env.example
++-- ai/             # workflow, reasoning graph, tools, RCA logic
+|   `-- tools/
+|       `-- rca_tools.py
++-- api/            # FastAPI endpoints and webhook/UI APIs
++-- app/            # controllers and renderers for the app layer
++-- services/       # watcher, consumer, MQTT bridge
++-- simulation/     # JaamSim runtime and logistics configuration
++-- ui/             # dashboard and digital twin resources
++-- db/             # database initialization scripts
++-- doc/            # architecture and workflow figures
++-- streamlit_app.py
+`-- README.md
 ```
 
----
+## Key Engineering Ideas
 
-## 2) Event schema (Kafka message)
+### Event-Driven Analysis
 
-Topic: `alert-events`
+The system reacts to abnormal events rather than relying only on manual querying. This makes the RCA workflow closer to real monitoring and operations scenarios.
 
-```json
-{
-  "time": "2026-02-02T08:10:00Z",
-  "thingId": "my_logistics_car2",
-  "alert_type": "motion_stopped",
-  "message": "Car has been stationary for 1 minute",
-  "car_position": [-10.9, -13.8, 0.01],
-  "branch_key": "branch_3",
-  "branch_value": 2,
-  "source": "influx-alerts-watcher"
-}
-```
+### Tool-Augmented Reasoning
 
-`car_position`, `branch_key`, `branch_value` should be included by your alert producer (watcher/webhook).
+The analysis process is built around tools, not a single prompt. That allows the workflow to retrieve evidence, compare branch states, inspect topology, and ground the final answer in system data.
 
----
+### Human-in-the-Loop Execution
 
-## 3) Quick start
+The project treats AI as a decision-support layer, not an always-autonomous controller. This is especially important when the recommended action changes routing behavior.
 
-### 3.1 Start infra (Kafka + Postgres + InfluxDB)
-```bash
-docker compose up -d
-```
+### Digital Twin Integration
 
-### 3.2 Create venv + install deps
-```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+The UI is not only a text console. It combines AI analysis, live inventory trends, and digital twin visualization so that reasoning and operational state can be inspected together.
 
-### 3.3 Configure env
-Copy `.env.example` → `.env` and fill values (especially `GEMINI_API_KEY`).
+## What I Wanted to Demonstrate
 
-### 3.4 Run producer (choose ONE)
-**A) Influx watcher → Kafka**
-```bash
-python services/influx_alert_watcher.py
-```
+This project was built to demonstrate the ability to design and implement:
 
-**B) Webhook → Kafka**
-```bash
-uvicorn api.webhook_server:app --host 0.0.0.0 --port 8001
-```
+- AI-native RCA workflows for industrial or cyber-physical systems
+- multi-stage reasoning pipelines instead of single-step prompting
+- event-driven system integration across simulation, streaming, storage, and UI
+- explainable corrective action recommendation with safety controls
+- product thinking around operator trust, observability, and intervention
 
-Then POST an event:
-```bash
-curl -X POST http://localhost:8001/webhook/alerts -H "Content-Type: application/json" -d @sample_event.json
-```
+## Notes
 
-### 3.4.1 Optional: MQTT -> Influx bridge (factory inventory)
-If you want Grafana to show live factory inventory from MQTT topics:
-```bash
-python services/mqtt_influx_bridge.py
-```
-
-Defaults:
-- MQTT topic: `factory/+`
-- Influx bucket: `factory_data`
-- Measurement: `factory`
-- Tags: `factory_id`, `thingId`, `sub_topic`, `topic`
-- Field: `count` (for numeric payload)
-
-Important envs:
-- `MQTT_HOST`, `MQTT_PORT`, `MQTT_TOPIC`
-- `INFLUX_URL`, `INFLUX_TOKEN`, `INFLUX_ORG`
-- `INFLUX_FACTORY_BUCKET` (default `factory_data`)
-- `FACTORY_ID_MAP_JSON` (default maps `f1..f4` to `my_factory_factoryA..D`)
-
-### 3.5 Run consumer (Kafka → analysis → Postgres + Kafka)
-```bash
-python services/alert_event_consumer.py
-```
-
-### 3.6 Run UI
-```bash
-streamlit run ui/streamlit_app.py
-```
-
-Open http://localhost:8501
-
----
-
-## 4) How it “assembles”
-
-- **Watchers / webhook** produce alert JSON to Kafka (`alert-events`)
-- **Consumer**:
-  1. reads one alert
-  2. calls `ai.workflow.build_workflow().stream(..., stream_mode="updates")`
-  3. merges updates into a final state
-  4. persists to Postgres `incident_analysis`
-  5. publishes a compact result to Kafka `analysis-results`
-- **UI** reads `incident_analysis` table and renders:
-  - trace updates (per node)
-  - final analysis markdown/json
-
----
-
-## 5) Common issues
-
-- If Influx tags/fields differ, update `ai/influx.py` filters (measurement/field/tag key).
-- If your alerts don’t have `car_position`/`branch_*`, add them in producer.
-- Gemini keys: use env `GEMINI_API_KEY` only.
-
----
-
-## 6) Grafana dashboard for 4 factories
-
-- Dashboard template file: `ui/grafana/factory_inventory_dashboard.json`
-- Import it in Grafana, then select your InfluxDB datasource.
-- The template expects:
-  - Bucket: `factory_data`
-  - Measurement: `factory`
-  - Field: `count`
-  - Tag: `factory_id` (`f1`,`f2`,`f3`,`f4`)
-
----
-
-## 7) 项目整体架构
-
-当前项目是一个“仿真数据 + 流处理 + 智能分析 + 可视化”的闭环系统：
-
-1. 仿真与数据源层  
-   - JaamSim 产生物流状态（小车位置、工厂/队列状态、分支状态）
-   - 运行配置位于 `simulation/logistics/`
-
-2. 事件采集与分发层  
-   - `services/influx_alert_watcher.py`：从 Influx 告警桶轮询并推送到 Kafka
-   - `api/webhook_server.py:/webhook/alerts`：接收外部事件并推送到 Kafka
-   - Kafka 主题：`alert-events`（输入）、`analysis-results`（输出）
-
-3. Agentic 分析层  
-   - `services/alert_event_consumer.py` 消费 `alert-events`
-   - 调用 `ai/workflow.py`（路由 + 事实收集 + RCA + 分支修复建议）
-   - 结果写入 Postgres（`incident_analysis`）并回发 Kafka
-
-4. UI 与控制层  
-   - 新前端：`ui/index_new.html`（主操作界面）
-   - 后端 UI API：`api/webhook_server.py` 下 `/ui-api/*`
-   - 支持运行时启停 watcher/consumer/simulation、查看日志、触发分析、应用分支修改
-
----
-
-## 8) 数字孪生面板设计
-
-数字孪生画板位于 `ui/threejs-demo/index.html`，通过 iframe 集成到 `ui/index_new.html`。
-
-主要设计点：
-
-1. 坐标与场景
-   - 使用统一世界缩放（`WORLD_SCALE`），保证“显示放大”不影响仿真原始坐标
-   - 工厂节点、车辆、路径均按同一坐标映射规则渲染
-
-2. 路网表达
-   - 当前采用“工厂两点直连”的道路绘制
-   - 灰色道路 + 中央白色虚线，便于区分运输通道
-
-3. 运动更新
-   - 小车位置来自 WS 事件流
-   - 采用插值/外推策略平滑运动，降低低频发布带来的跳变感
-
-4. 诊断能力
-   - 面板内提供连接状态、包计数、最后一包时间，便于排查“卡顿是渲染问题还是上游断流”
-
----
-
-## 9) Dashboard 设计
-
-当前 Dashboard 以 `ui/index_new.html` 的 Live 视图为主，布局为：
-
-1. 左侧（主区）
-   - 上：Digital Twin（约 2/3 高度）
-   - 下：Factory Inventory 折线图 + 四工厂当前值卡片（约 1/3 高度）
-
-2. 右侧（AI Chat）
-   - 聊天分析、修复建议确认、日志反馈
-   - 输入框支持动态扩展（点击后升高，多行输入）
-
-3. 图表体验
-   - 支持 1m / 5m / 15m 窗口
-   - 时间轴采用短时刻度显示（`HH:MM:SS`）并自动抽样，避免标签拥挤
-
-备注：Grafana 模板仍保留在 `ui/grafana/factory_inventory_dashboard.json`，可作为独立监控大盘方案。
-
----
-
-## 10) Agentic Workflow 决策链路设计
-
-核心链路从“异常事件”到“可执行动作”：
-
-1. 事件输入
-   - 来源：Kafka 告警、Webhook 手工事件、UI 聊天事件
-
-2. 路由与事实采集
-   - `prepare_workflow_preview(event)`：识别意图与模式
-   - 结合 Influx 指标、PG 配置、文件分支状态，形成事实集
-
-3. RCA 推理与建议
-   - `execute_planned_workflow(preview)`：执行规则 + 模型分析
-   - 输出 `analysis`、`branch_fix_proposal`、证据链与下一步检查项
-
-4. 人在回路（Human-in-the-loop）
-   - 前端显示“Pending branch change”
-   - 用户确认后调用 `/ui-api/branch/apply` 修改分支文件值
-
-5. 异常兜底
-   - 当 LLM 不可用（如 429 quota）时，`/ui-api/analyze` 会返回可读错误信息而非静默失败，保证交互可观测。
-
----
-
-## 11) Reliability and Reasoning Improvements (English)
-
-### 11.1 Exception Message Idempotency
-
-**Problem**  
-In this project, alerts are ingested by Watcher/Webhook, sent to Kafka, and then processed by the Consumer workflow. Because there is a delay between event emission and analysis completion, the same abnormal event can be reported multiple times in a short period (for example, repeated `motion_stopped` events). This causes duplicate consumption, duplicate RCA execution, and duplicate database writes.
-
-**Root Cause**  
-Alert generation is continuous/polling-based. Without a deduplication window, one business incident is treated as multiple independent events.
-
-**Solution**  
-Add time-window idempotency at ingress and consumer stages:
-- Process only one event of the same class within a fixed window (for example, 60 seconds).
-- Build an idempotency key from `event_type + entity_id + time_window`.
-- Skip duplicated messages that hit the same key/window.
-
-**Outcome**  
-This reduces redundant workflow executions and repeated notifications, lowers Kafka/LLM/DB load, and improves result consistency and system stability.
-
-### 11.2 AI Reasoning Logic Optimization
-
-**Problem**  
-Early reasoning tended to over-focus on local symptoms (for example, an empty queue) and could misidentify the wrong branch as root cause. In the logistics scenario, the model previously suggested fixing `branch2`, while the real issue was that `branch3=1` trapped carriers on the `p23` route, preventing vehicles from returning to transport `p2`.
-
-**Root Cause**  
-Local metric signals alone are insufficient. The model needs global constraints from the logistics topology (factories, products, branches, and transport edges) plus carrier state.
-
-**Solution**  
-Use a hybrid “rules-first + LLM-summary” pipeline:
-- Convert `jaamsim_config` into a structured dependency graph (produce/assemble/logistics edges/branch mapping).
-- Collect deterministic facts first (branch values, required assembly inputs, queue metrics, car-park location).
-- Distinguish true material shortage vs. transport-coverage shortage under topology constraints.
-- Use LLM only for concise RCA narrative and action explanation.
-- Keep Human-in-the-loop confirmation before applying branch changes.
-
-**Outcome**  
-The workflow moves from symptom-based guesses to explainable causal reasoning, reducing misclassification and generating more actionable branch decisions.
-
-### 11.3 Real-Time Rendering Pitfalls: Data Freshness + Embedded Runtime Throttling
-
-**Problem**  
-The digital twin sometimes appeared frozen or laggy, even though backend services were running. Two issues overlapped:
-- **Data freshness mismatch**: simulation state was published at a lower cadence (for example, every 0.5s), while the frontend attempted higher-frequency rendering.
-- **Embedded runtime throttling**: when the twin was hosted inside an iframe, browser scheduling behavior could throttle animation/update loops under specific focus/visibility conditions.
-
-**Why it was misleading**  
-This looked like a pure rendering-performance problem, but the root cause was a combination of update cadence mismatch and runtime scheduling constraints.
-
-**Mitigation implemented in this project**
-- Matched interpolation delay to source publish cadence.
-- Increased controlled extrapolation window to bridge short data gaps.
-- Switched to stable frame limiting for predictable refresh behavior.
-- Added in-panel diagnostics (packet count, last-packet age) to distinguish “no new data” from “render loop issue”.
-
-**Outcome**  
-The twin behavior became smoother and, more importantly, diagnosable. The team can now separate upstream data stalls from frontend rendering issues during troubleshooting.
+- The repository is intended as a public project showcase, so secrets should remain in `.env` and never be committed.
